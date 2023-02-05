@@ -30,20 +30,33 @@ Func _BootCheck()
 	EndSwitch
 EndFunc   ;==>_BootCheck
 
-Func _CPUNameCheck($sCPU, $sVersion)
+Func _CPUNameCheck($sCPU, $sFamily, $sVersion, $bAppCompat = False)
+
+	If $bAppCompat Then
+		Local $sReg = RegRead("HKLM64\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\TargetVersionUpgradeExperienceIndicators\NI22H2", "RedReason")
+		If @error Then
+			SetError(1, 0, False)
+		Else
+			Return Not StringInStr($sReg, "CpuFms")
+		EndIf
+	EndIf
+
 	Local $iLines, $sLine, $ListFile
+
 	Select
 		Case StringInStr($sCPU, "AMD")
+			If $sFamily >= 25 Then Return True
 			If StringInStr($sCPU, "1600") And StringInStr($sVersion, "Stepping 2") Then Return True ; 1600AF
 			$ListFile = "\WhyNotWin11\SupportedProcessorsAMD.txt"
 		Case StringInStr($sCPU, "Intel")
+			If $sFamily = 6 And StringRegExp($sVersion, ".*Model\s(1[6-9][0-9]|2[0-9]{2})\s.*") Then Return True
 			$ListFile = "\WhyNotWin11\SupportedProcessorsIntel.txt"
 		Case StringInStr($sCPU, "SnapDragon") Or StringInStr($sCPU, "Microsoft")
 			$ListFile = "\WhyNotWin11\SupportedProcessorsQualcomm.txt"
 	EndSelect
 
 	If $ListFile = Null Then
-		Return False
+		Return SetError(1, 0, False)
 	Else
 		$iLines = _FileCountLines(@LocalAppDataDir & $ListFile)
 		If @error Then Return SetError(1, 0, False)
@@ -190,8 +203,17 @@ Func _InternetCheck()
 	Return _WinAPI_IsInternetConnected()
 EndFunc
 
-Func _MemCheck()
+Func _MemCheck($bAppCompat = False)
 	Local Static $vMem
+
+	If $bAppCompat Then
+		Local $sReg = RegRead("HKLM64\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\TargetVersionUpgradeExperienceIndicators\NI22H2", "RedReason")
+		If @error Then
+			Return SetError(1, 0, False)
+		Else
+			Return Not StringInStr($sReg, "Memory")
+		EndIf
+	EndIf
 
 	If Not $vMem <> "" Then
 		$vMem = DllCall(@SystemDir & "\Kernel32.dll", "int", "GetPhysicallyInstalledSystemMemory", "int*", "")
@@ -216,9 +238,20 @@ Func _MemCheck()
 	EndIf
 EndFunc   ;==>_MemCheck
 
-Func _SecureBootCheck()
+Func _SecureBootCheck($bAppCompat = False)
+
+	If $bAppCompat Then
+		Local $sReg = RegRead("HKLM64\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\TargetVersionUpgradeExperienceIndicators\NI22H2", "RedReason")
+		If @error Then
+			Return SetError(1, 0, False)
+		Else
+			Return Not StringInStr($sReg, "CpuFms")
+		EndIf
+	EndIf
+
 	Local $sSecureBoot = RegRead("HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot\State", "UEFISecureBootEnabled")
 	If @error Then $sSecureBoot = 999
+
 	Switch $sSecureBoot
 		Case 1
 			Return SetError(0, 1, True)
@@ -229,8 +262,24 @@ Func _SecureBootCheck()
 	EndSwitch
 EndFunc   ;==>_SecureBootCheck
 
-Func _SpaceCheck()
-	Local $sWindows = EnvGet("SystemDrive")
+Func _SpaceCheck($sDrive = Null, $bAppCompat = False)
+
+	If $bAppCompat Then
+		Local $sReg = RegRead("HKLM64\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\TargetVersionUpgradeExperienceIndicators\NI22H2", "SystemDriveTooFull")
+		If @error Then
+			Return SetError(1, 0, False)
+		Else
+			Return Not Int($sReg)
+		EndIf
+	EndIf
+
+	Local $sWindows
+
+	If $sDrive = Null Then
+		$sWindows = EnvGet("SystemDrive")
+	Else
+		$sWindows = $sDrive
+	EndIf
 
 	Local $iFree = Round(DriveSpaceTotal($sWindows) / 1024, 0)
 	Local $aDrives = DriveGetDrive($DT_FIXED)
@@ -247,7 +296,17 @@ Func _SpaceCheck()
 	EndIf
 EndFunc   ;==>_SpaceCheck
 
-Func _TPMCheck()
+Func _TPMCheck($bAppCompat = False)
+
+	If $bAppCompat Then
+		Local $sReg = RegRead("HKLM64\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\TargetVersionUpgradeExperienceIndicators\NI22H2", "RedReason")
+		If @error Then
+			Return SetError(1, 0, False)
+		Else
+			Return Not StringInStr($sReg, "Tpm")
+		EndIf
+	EndIf
+
 	Select
 		Case _GetTPMInfo(0) = False
 			ContinueCase
